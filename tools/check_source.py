@@ -32,6 +32,20 @@ def check():
  assert '- (BOOL)canBecomeKeyWindow { return NO; }' in compact
  assert 'return nil; }' in compact and 'Window.userInteractionEnabled = NO' in compact
  assert 'SBLockScreenManager' in compact and 'isUILocked' in compact
+ assert 'class_getInstanceMethod(cls, locked)' in compact
+ assert 'class_getInstanceMethod(object_getClass(manager), locked)' not in compact
+ assert 'class_getInstanceMethod([view class], selector)' in compact
+ assert 'CompactFallbackTree' in compact and 'return NB27ClockText(' in compact
+ assert 'CompactActiveScene(' in compact
+ assert 'NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *reference)' in compact
+ assert 'FOUNDATION_EXPORT NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *reference);' in (ROOT/'Sources/NB27Compact.h').read_text()
+ hook=source[source.index('static void NB27AnimateHook('):source.index('static void NB27AddHook(')]
+ pre=hook.index('incoming.timeAnchor=NB27CompactPrepareTimeAnchor(context.containerView);')
+ assert pre < hook.rindex('NB27OriginalAnimate(animator,cmd,context);') < hook.index('NB27AnimateEntrance(incoming,actual);')
+ assert 'if(!NB27MeasureCompactOrigin(s,card)){NB27End(s);return;}' in source
+ prepare_exit=source[source.index('static NB27Session *NB27PrepareExit('):source.index('static void NB27StagePending(')]
+ assert prepare_exit.index('NB27MeasureCompactOrigin(s,card)') < prepare_exit.index('NB27CompactBeginExit(s.motionOriginReady)')
+ assert 'NB27ReferenceLayerAt(' in source and 'NB27ReferenceLayerReverse(' in source
  assert 'com.apple.springboard.lockstate' in compact
  assert not any(x in compact for x in ('makeKeyAndVisible','MSHookMessageEx','method_setImplementation','removeAllAnimations'))
  assert 'method_copyArgumentType' in source and 'method_copyReturnType' in source
@@ -51,7 +65,7 @@ def check():
  assert '\n  push:' not in workflow and '\n  pull_request:' not in workflow
  assert 'macos-latest' in workflow
  with tempfile.TemporaryDirectory() as td:
-  for name in ('motion','reference_motion','compact'):
+  for name in ('motion','reference_motion','compact','clock'):
    binary=pathlib.Path(td)/(name+'-tests')
    subprocess.run([shutil.which('clang') or 'cc','-std=c11','-O2','-Wall','-Wextra','-Werror',str(ROOT/('tests/test_'+name+'.c')),'-lm','-o',str(binary)],check=True)
    subprocess.run([str(binary)],check=True)

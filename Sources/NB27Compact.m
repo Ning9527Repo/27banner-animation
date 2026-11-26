@@ -1,5 +1,6 @@
 #import "NB27Compact.h"
 #import "NB27CompactState.h"
+#import "NB27ClockText.h"
 #import "NB27Diagnostics.h"
 #import <QuartzCore/QuartzCore.h>
 #import <objc/message.h>
@@ -42,6 +43,7 @@ static NSTimer *Timer;
 static NB27CompactWatch *Watch;
 static CFTimeInterval LastScan = -DBL_MAX;
 static void CompactRefresh(void);
+static void CompactObserve(void);
 
 static BOOL CompactRect(CGRect r) {
     return isfinite(r.origin.x) && isfinite(r.origin.y) &&
@@ -50,9 +52,13 @@ static BOOL CompactRect(CGRect r) {
 static BOOL CompactSpringBoard(void) {
     return [NSBundle.mainBundle.bundleIdentifier isEqualToString:@"com.apple.springboard"];
 }
-static void CompactDiagnostic(void) {
+static void CompactDiagnostic(NSString *reason) {
     static unsigned count;
-    if (count < 4) { ++count; NSLog(@"[NB27Compact] native time anchor unavailable; hidden"); }
+    if (count < 4) {
+        ++count;
+        NB27Diagnostic(@"compact-anchor-scan", reason);
+        NSLog(@"[NB27Compact] compact anchor unavailable: %@", reason);
+    }
 }
 static void CompactClearAnchor(void) {
     HaveAnchor = NO; TimeItem = nil; TimeLabel = nil; SourceWindow = nil; Ink = nil;
@@ -84,7 +90,7 @@ static BOOL CompactUnlocked(void) {
     @try {
         id manager = ((id (*)(id, SEL))objc_msgSend)(cls, shared);
         if (!manager || ![manager isKindOfClass:cls]) return NO;
-        char type = CompactReturn(class_getInstanceMethod(object_getClass(manager), locked));
+        char type = CompactReturn(class_getInstanceMethod(cls, locked));
         if (type == 'B') return !((bool (*)(id, SEL))objc_msgSend)(manager, locked);
         if (type == 'c') return !((signed char (*)(id, SEL))objc_msgSend)(manager, locked);
     } @catch (NSException *exception) { (void)exception; }
@@ -98,12 +104,39 @@ static BOOL CompactVisible(UIView *v) {
     }
     return NO;
 }
+static BOOL CompactReadBar(UIWindowScene *scene, CGRect *bar) {
+    if (!scene || !bar) return NO;
+    UIScreen *screen = scene.screen;
+    if (screen != UIScreen.mainScreen ||
+        scene.activationState != UISceneActivationStateForegroundActive ||
+        scene.interfaceOrientation != UIInterfaceOrientationPortrait) return NO;
+    CGRect sb = screen.coordinateSpace.bounds, cb = scene.coordinateSpace.bounds;
+    if (!CompactRect(sb) || !CompactRect(cb) || sb.size.width >= sb.size.height ||
+        !CGRectEqualToRect(sb, [scene.coordinateSpace convertRect:cb toCoordinateSpace:screen.coordinateSpace])) return NO;
+    UIStatusBarManager *manager = scene.statusBarManager;
+    CGRect frame = manager.statusBarFrame;
+    if (!manager || manager.statusBarHidden || !CompactRect(frame) ||
+        !CGRectContainsRect(sb, frame) || fabs(CGRectGetMinY(frame) - CGRectGetMinY(sb)) > .5 ||
+        frame.size.height > sb.size.height * .15) return NO;
+    *bar = frame;
+    return YES;
+}
+static UIWindowScene *CompactActiveScene(UIWindowScene *preferred, CGRect *bar) {
+    if (CompactReadBar(preferred, bar)) return preferred;
+    UIWindowScene *cached = Scene;
+    if (cached != preferred && CompactReadBar(cached, bar)) return cached;
+    for (UIScene *candidate in UIApplication.sharedApplication.connectedScenes) {
+        if (![candidate isKindOfClass:UIWindowScene.class] || candidate == preferred || candidate == cached) continue;
+        if (CompactReadBar((UIWindowScene *)candidate, bar)) return (UIWindowScene *)candidate;
+    }
+    return nil;
+}
 static UIColor *CompactTextColor(UIView *view) {
     if ([view isKindOfClass:UILabel.class]) return ((UILabel *)view).textColor;
     Class cls = NSClassFromString(@"_UIStatusBarStringView");
     SEL selector = NSSelectorFromString(@"textColor");
     if (!cls || ![view isKindOfClass:cls] ||
-        CompactReturn(class_getInstanceMethod(object_getClass(view), selector)) != '@') return nil;
+        CompactReturn(class_getInstanceMethod([view class], selector)) != '@') return nil;
     @try {
         id value = ((id (*)(id, SEL))objc_msgSend)(view, selector);
         return [value isKindOfClass:UIColor.class] ? value : nil;
@@ -119,15 +152,21 @@ static BOOL CompactCapture(UIView *item, UIView *label) {
     UIWindowScene *sourceScene = w.windowScene;
     if (sourceScene && (sourceScene.interfaceOrientation != UIInterfaceOrientationPortrait ||
         sourceScene.screen != Screen || !CGRectEqualToRect(sourceScene.coordinateSpace.bounds, SceneBounds))) return NO;
-    CGRect i = [item convertRect:item.bounds toCoordinateSpace:Screen.coordinateSpace];
-    CGRect l = [label convertRect:label.bounds toCoordinateSpace:Screen.coordinateSpace];
+    CGRect textBounds = label.bounds;
+    if ([label isKindOfClass:UILabel.class]) {
+        UILabel *ui = (UILabel *)label;
+        CGRect fit = CGRectIntersection(ui.bounds, [ui textRectForBounds:ui.bounds limitedToNumberOfLines:ui.numberOfLines]);
+        if (CompactRect(fit)) textBounds = fit;
+    }
+    CGRect l = [label convertRect:textBounds toCoordinateSpace:Screen.coordinateSpace];
+    CGRect i = item == label ? l : [item convertRect:item.bounds toCoordinateSpace:Screen.coordinateSpace];
     if (!CompactRect(i) || !CompactRect(l) ||
         !CGRectContainsRect(CGRectInset(Bar, -.5, -.5), i) ||
         !CGRectContainsRect(CGRectInset(i, -.5, -.5), l) ||
         l.size.width < l.size.height * .8 || i.size.width > ScreenBounds.size.width * .45) return NO;
-    CGRect line = CGRectMake(CGRectGetMinX(i), CGRectGetMaxY(Bar) - 4,
-                             i.size.width, 2); /* center 3pt above bar bottom; reference ~5px at 946px width */
-    if (CGRectGetMinY(line) < CGRectGetMaxY(l) || !CGRectContainsRect(Bar, line)) return NO;
+    CGFloat lineY = fmax(CGRectGetMaxY(Bar) - 4, CGRectGetMaxY(l) + 1);
+    CGRect line = CGRectMake(CGRectGetMinX(i), lineY, i.size.width, 2);
+    if (!CGRectContainsRect(Bar, line)) return NO;
     UIColor *color = [CompactTextColor(label) resolvedColorWithTraitCollection:label.traitCollection];
     if (!color || !color.CGColor) return NO;
     CGFloat alpha = CGColorGetAlpha(color.CGColor);
@@ -137,16 +176,68 @@ static BOOL CompactCapture(UIView *item, UIView *label) {
     Line = line; CacheBar = Bar; Ink = [color colorWithAlphaComponent:alpha * .55]; HaveAnchor = YES;
     return YES;
 }
+static BOOL CompactIsClockLabel(UIView *view);
 static BOOL CompactLabels(UIView *v, UIView *item, unsigned depth, NSUInteger *budget) {
     if (!v || depth > 4 || !*budget) return NO;
     --*budget;
     if (v.hidden || v.alpha <= .01) return NO;
     Class nativeString = NSClassFromString(@"_UIStatusBarStringView");
     if (([v isKindOfClass:UILabel.class] || (nativeString && [v isKindOfClass:nativeString])) &&
-        CompactCapture(item, v)) return YES;
+        CompactIsClockLabel(v) && CompactCapture(item, v)) return YES;
     for (UIView *child in v.subviews) {
         if (!*budget) break;
         if (CompactLabels(child, item, depth + 1, budget)) return YES;
+    }
+    return NO;
+}
+static NSString *CompactStringValue(UIView *view) {
+    if ([view isKindOfClass:UILabel.class]) {
+        UILabel *label = (UILabel *)view;
+        return label.text.length ? label.text : label.attributedText.string;
+    }
+    for (NSString *name in @[@"text", @"string", @"accessibilityLabel"]) {
+        SEL selector = NSSelectorFromString(name);
+        Method method = class_getInstanceMethod([view class], selector);
+        if (CompactReturn(method) != '@') continue;
+        @try {
+            id value = ((id (*)(id, SEL))objc_msgSend)(view, selector);
+            if ([value isKindOfClass:NSString.class]) return value;
+            if ([value isKindOfClass:NSAttributedString.class]) return [value string];
+        } @catch (NSException *exception) { (void)exception; }
+    }
+    return nil;
+}
+static BOOL CompactIsClockLabel(UIView *view) {
+    Class nativeString = NSClassFromString(@"_UIStatusBarStringView");
+    if (![view isKindOfClass:UILabel.class] && !(nativeString && [view isKindOfClass:nativeString])) return NO;
+    // Keep the text fallback inside status-bar views, not other SpringBoard UI.
+    BOOL belongsToStatusBar = NO;
+    UIView *ancestor = view;
+    for (unsigned n = 0; ancestor && n < 18; ++n, ancestor = ancestor.superview) {
+        NSString *name = NSStringFromClass(object_getClass(ancestor));
+        if ([name hasPrefix:@"_UIStatusBar"] || [name hasPrefix:@"UIStatusBar"] ||
+            [name hasPrefix:@"SBStatusBar"] || [name hasPrefix:@"STStatusBar"]) {
+            belongsToStatusBar = YES; break;
+        }
+    }
+    if (!belongsToStatusBar) return NO;
+    CGRect bounds = [view convertRect:view.bounds toCoordinateSpace:Screen.coordinateSpace];
+    if (!CompactRect(bounds) || !CGRectContainsRect(CGRectInset(Bar, -.5, -.5), bounds)) return NO;
+    BOOL rtl = view.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+    CGFloat x = CGRectGetMidX(bounds), mid = CGRectGetMidX(ScreenBounds);
+    if (rtl ? x < mid : x > mid) return NO;
+    NSString *text = CompactStringValue(view);
+    if (!text.length || text.length > 256) return NO;
+    return NB27ClockText(text.UTF8String, [text lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+}
+static BOOL CompactFallbackTree(UIView *v, unsigned depth, NSUInteger *budget) {
+    if (!v || depth > 16 || !*budget) return NO;
+    --*budget;
+    if (v.hidden || v.alpha <= .01) return NO;
+    if (CompactIsClockLabel(v) && CompactCapture(v, v)) return YES;
+    for (UIView *child in v.subviews) {
+        if (!*budget) break;
+        if (CompactFallbackTree(child, depth + 1, budget)) return YES;
     }
     return NO;
 }
@@ -154,7 +245,7 @@ static BOOL CompactTree(UIView *v, Class cls, unsigned depth, NSUInteger *budget
     if (!v || depth > 12 || !*budget) return NO;
     --*budget;
     if (v.hidden || v.alpha <= .01) return NO;
-    if ([v isKindOfClass:cls]) return CompactLabels(v, v, 0, budget);
+    if (cls && [v isKindOfClass:cls] && CompactLabels(v, v, 0, budget)) return YES;
     for (UIView *child in v.subviews) {
         if (!*budget) break;
         if (CompactTree(child, cls, depth + 1, budget)) return YES;
@@ -166,7 +257,6 @@ static BOOL CompactScan(void) {
     if (now - LastScan < 2) return NO;
     LastScan = now;
     Class cls = NSClassFromString(@"_UIStatusBarTimeItemView");
-    if (!cls) { CompactDiagnostic(); return NO; }
     NSMutableArray<UIWindow *> *windows = [NSMutableArray new];
     unsigned scenes = 0;
     for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
@@ -187,40 +277,50 @@ static BOOL CompactScan(void) {
         if (![windows containsObject:w]) [windows addObject:w];
     }
 #pragma clang diagnostic pop
-    NSUInteger budget = 384;
+    [windows sortUsingComparator:^NSComparisonResult(UIWindow *a, UIWindow *b) {
+        if (a.windowLevel != b.windowLevel)
+            return a.windowLevel > b.windowLevel ? NSOrderedAscending : NSOrderedDescending;
+        CGFloat ay = CGRectGetMinY(a.frame), by = CGRectGetMinY(b.frame);
+        if (ay != by) return ay < by ? NSOrderedAscending : NSOrderedDescending;
+        return NSOrderedSame;
+    }];
+    NSUInteger budget = 2048;
     for (UIWindow *w in windows) {
         if (!budget) break;
         if (w == Window || [w isKindOfClass:NB27CompactWindow.class] || w.screen != Screen) continue;
-        if (CompactTree(w, cls, 0, &budget)) return YES;
+        if (cls && CompactTree(w, cls, 0, &budget)) return YES;
     }
-    if (!HaveAnchor) CompactDiagnostic();
+    /* iOS 17 SpringBoard may expose the time label without the older private
+       _UIStatusBarTimeItemView wrapper. Match only an actual HH:mm text view
+       geometrically contained in the live status-bar frame, never the banner. */
+    budget = 4096;
+    for (UIWindow *w in windows) {
+        if (!budget) break;
+        if (w == Window || [w isKindOfClass:NB27CompactWindow.class] || w.screen != Screen) continue;
+        if (CompactFallbackTree(w, 0, &budget)) return YES;
+    }
+    if (!HaveAnchor) CompactDiagnostic(cls ? @"time-item class found, no visible valid clock label in bounded status windows" :
+        @"time-item class absent, no visible valid HH:mm label in bounded status windows");
     return NO;
 }
 static BOOL CompactContext(UIView *card) {
-    if (!CompactAllowed() || UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPhone ||
-        !CompactUnlocked()) return NO;
-    UIWindowScene *scene = card ? card.window.windowScene : (Reference.window.windowScene ?: Scene);
+    if (!CompactAllowed() || UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPhone) return NO;
+    if (!CompactUnlocked()) {
+        CompactDiagnostic(@"UI locked or lock state unavailable"); return NO;
+    }
+    CGRect bar = CGRectZero;
+    UIWindowScene *scene = CompactActiveScene(card.window.windowScene ?: Reference.window.windowScene, &bar);
+    if (!scene) {
+        CompactClearAnchor(); CompactDiagnostic(@"no active portrait status bar"); return NO;
+    }
     UIScreen *screen = scene.screen;
-    if (!scene || screen != UIScreen.mainScreen ||
-        scene.activationState != UISceneActivationStateForegroundActive ||
-        scene.interfaceOrientation != UIInterfaceOrientationPortrait) return NO;
     CGRect sb = screen.coordinateSpace.bounds, cb = scene.coordinateSpace.bounds;
-    if (!CompactRect(sb) || !CompactRect(cb) || sb.size.width >= sb.size.height ||
-        !CGRectEqualToRect(sb, [scene.coordinateSpace convertRect:cb toCoordinateSpace:screen.coordinateSpace])) return NO;
     if (Screen != screen || Scene != scene || !CGRectEqualToRect(sb, ScreenBounds) ||
         !CGRectEqualToRect(cb, SceneBounds)) {
-        BOOL existed = Screen != nil;
-        BOOL sameGeometry = Screen == screen && CGRectEqualToRect(sb, ScreenBounds) && CGRectEqualToRect(cb, SceneBounds);
-        CompactDropWindow();
-        if (!sameGeometry) CompactClearAnchor();
+        CompactDropWindow(); CompactClearAnchor(); LastScan = -DBL_MAX;
         Screen = screen; Scene = scene; ScreenBounds = sb; SceneBounds = cb;
-        if (existed) return NO;
     }
-    UIStatusBarManager *manager = scene.statusBarManager;
-    Bar = manager.statusBarFrame; /* UIKit statusBarFrame is in screen coordinates. */
-    if (!manager || manager.statusBarHidden || !CompactRect(Bar) ||
-        !CGRectContainsRect(sb, Bar) || fabs(CGRectGetMinY(Bar) - CGRectGetMinY(sb)) > .5 ||
-        Bar.size.height > sb.size.height * .15) { CompactClearAnchor(); return NO; }
+    Bar = bar;
     if (HaveAnchor && !CGRectEqualToRect(CacheBar, Bar)) CompactClearAnchor();
     UIWindow *source = SourceWindow;
     if (HaveAnchor && source && (source.screen != screen ||
@@ -302,26 +402,46 @@ void NB27CompactSetEnabled(BOOL enabled) {
 void NB27CompactNoteEntrance(UIView *card) {
     if (!NSThread.isMainThread || !card) return;
     Reference = card; CompactObserve();
-    if (!CompactContext(card) && Window) Window.hidden = YES;
+    if (State.retained && !CompactContext(card) && Window) Window.hidden = YES;
 }
-BOOL NB27CompactOriginForCard(UIView *card, CGPoint *center, CGSize *size) {
+NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *reference) {
+    NB27CompactAnchor anchor = {0};
+    if (!NSThread.isMainThread) return anchor;
+    CompactObserve();
+    if (!CompactContext(reference)) return anchor;
+    anchor.line = Line; anchor.screenBounds = ScreenBounds; anchor.sceneBounds = SceneBounds;
+    anchor.capturedAt = CACurrentMediaTime(); anchor.valid = YES;
+    return anchor;
+}
+BOOL NB27CompactOriginFromAnchor(UIView *card, NB27CompactAnchor anchor, CGPoint *center, CGSize *size) {
     if (!NSThread.isMainThread || !card || !center || !size || !card.superview || !card.window) return NO;
-    if (!CompactContext(card)) { if (Window) Window.hidden = YES; return NO; }
+    if (!anchor.valid || !CompactRect(anchor.line) || !CompactAllowed() || !CompactUnlocked()) return NO;
+    double age = CACurrentMediaTime() - anchor.capturedAt;
+    if (!isfinite(age) || age < 0 || age > 1) return NO;
+    UIWindowScene *scene = card.window.windowScene;
+    UIScreen *screen = card.window.screen;
+    if (!scene) return NO;
+    UISceneActivationState activation = scene.activationState;
+    if (screen != UIScreen.mainScreen || scene.screen != screen ||
+        (activation != UISceneActivationStateForegroundActive && activation != UISceneActivationStateForegroundInactive) ||
+        scene.interfaceOrientation != UIInterfaceOrientationPortrait ||
+        !CGRectEqualToRect(scene.coordinateSpace.bounds, anchor.sceneBounds) ||
+        !CGRectEqualToRect([scene.coordinateSpace convertRect:anchor.sceneBounds toCoordinateSpace:screen.coordinateSpace], anchor.screenBounds) ||
+        !CGRectEqualToRect(screen.coordinateSpace.bounds, anchor.screenBounds)) return NO;
     UIView *parent = card.superview;
     if (card.layer.superlayer != parent.layer || !CompactRect(parent.bounds) || !CompactRect(card.bounds)) return NO;
-    CGRect r = [parent convertRect:Line fromCoordinateSpace:Screen.coordinateSpace];
-    CGPoint p = [parent convertPoint:CGPointMake(CGRectGetMidX(Line), CGRectGetMidY(Line))
-                fromCoordinateSpace:Screen.coordinateSpace];
+    CGRect r = [parent convertRect:anchor.line fromCoordinateSpace:screen.coordinateSpace];
+    CGPoint p = [parent convertPoint:CGPointMake(CGRectGetMidX(anchor.line), CGRectGetMidY(anchor.line))
+                fromCoordinateSpace:screen.coordinateSpace];
     if (!CompactRect(r) || !isfinite(p.x) || !isfinite(p.y)) return NO;
-    CGPoint back = [parent convertPoint:p toCoordinateSpace:Screen.coordinateSpace];
-    if (!isfinite(back.x) || !isfinite(back.y) || fabs(back.x - CGRectGetMidX(Line)) > .5 ||
-        fabs(back.y - CGRectGetMidY(Line)) > .5) return NO;
+    CGPoint back = [parent convertPoint:p toCoordinateSpace:screen.coordinateSpace];
+    if (!isfinite(back.x) || !isfinite(back.y) || fabs(back.x - CGRectGetMidX(anchor.line)) > .5 ||
+        fabs(back.y - CGRectGetMidY(anchor.line)) > .5) return NO;
     Reference = card; *center = p; *size = r.size; return YES;
 }
-NSUInteger NB27CompactBeginExit(UIView *card) {
-    if (!NSThread.isMainThread) return 0;
-    CompactObserve(); CGPoint center; CGSize size;
-    BOOL supported = NB27CompactOriginForCard(card, &center, &size);
+NSUInteger NB27CompactBeginExit(BOOL supported) {
+    if (!NSThread.isMainThread || !CompactAllowed()) return 0;
+    CompactObserve();
     NSUInteger ticket = (NSUInteger)NB27CompactStateBegin(&State, supported);
     CompactTimer(); return ticket;
 }

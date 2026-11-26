@@ -11,7 +11,7 @@ write('Resources/entry.plist',{'entry':{
 write('Resources/Info.plist',{
  'CFBundleIdentifier':'com.ning.27banneranimation.preferences','CFBundleName':'NB27Preferences',
  'CFBundleExecutable':'NB27Preferences','CFBundlePackageType':'BNDL',
- 'CFBundleShortVersionString':'0.2','CFBundleVersion':'0.2','NSPrincipalClass':'NB27Preferences'})
+ 'CFBundleShortVersionString':'0.3','CFBundleVersion':'0.3','NSPrincipalClass':'NB27Preferences'})
 write('Resources/Root.plist',{'title':'27banner animation','items':[
  {'cell':'PSGroupCell','label':'通知横幅动画',
   'footerText':'iOS 27 横幅进出场动画。开启“减弱动态效果”时回退原生动画。'},

@@ -13,8 +13,15 @@
  * both output pointers must be non-NULL and remain untouched on failure. */
 FOUNDATION_EXPORT void NB27CompactSetEnabled(BOOL enabled);
 FOUNDATION_EXPORT void NB27CompactNoteEntrance(UIView *card);
-FOUNDATION_EXPORT NSUInteger NB27CompactBeginExit(UIView *card);
+typedef struct {
+    CGRect line, screenBounds, sceneBounds;
+    double capturedAt;
+    BOOL valid;
+} NB27CompactAnchor;
+/* Capture screen geometry before native layout; convert only after it settles. */
+FOUNDATION_EXPORT NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *reference);
+FOUNDATION_EXPORT BOOL NB27CompactOriginFromAnchor(UIView *card, NB27CompactAnchor anchor,
+    CGPoint *centerInLayerParent, CGSize *lineSize);
+FOUNDATION_EXPORT NSUInteger NB27CompactBeginExit(BOOL supported);
 FOUNDATION_EXPORT void NB27CompactFinishExit(NSUInteger ticket);
 FOUNDATION_EXPORT void NB27CompactAbortExit(NSUInteger ticket);
-FOUNDATION_EXPORT BOOL NB27CompactOriginForCard(UIView *card,
-    CGPoint *centerInLayerParent, CGSize *lineSize);

@@ -41,6 +41,17 @@ int main(void) {
    NB27ReferencePose rev=NB27ReferenceReverse(0,start,w,h,ax,ay,dx,dy);
    near(rev.scaleX+at.scaleX,p.scaleX);near(rev.scaleY+at.scaleY,p.scaleY);
    near(rev.x+at.x,p.x);near(rev.y+at.y,p.y);
+   const double bx=.72, by=1.12;
+   NB27ReferencePose scaled=NB27ReferenceLayerAt(start,w,h,ax,ay,dx,dy,bx,by);
+   NB27ReferencePose compact=NB27ReferenceLayerAt(0,w,h,ax,ay,dx,dy,bx,by);
+   NB27ReferencePose collapse=NB27ReferenceLayerReverse(0,start,w,h,ax,ay,dx,dy,bx,by);
+   near(bx+compact.scaleX,bx*NB27Motion(0,0));
+   near(by+compact.scaleY,by*NB27Motion(0,1));
+   near(compact.x+(.5-ax)*w*compact.scaleX,dx);
+   near(compact.y+(.5-ay)*h*compact.scaleY,dy);
+   near(scaled.scaleX+collapse.scaleX,compact.scaleX);
+   near(scaled.scaleY+collapse.scaleY,compact.scaleY);
+   near(scaled.x+collapse.x,compact.x);near(scaled.y+collapse.y,compact.y);
   }
  }
  printf("PASS: %lu reference coordinate/mirroring/interrupted-exit assertions; not UIKit runtime\n",cases);

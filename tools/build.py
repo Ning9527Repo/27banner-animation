@@ -2,7 +2,7 @@
 """Manual macOS/Xcode build. No network, installing, respring, or CI dispatch."""
 import argparse,hashlib,io,json,pathlib,plistlib,shutil,struct,subprocess,tarfile
 ROOT=pathlib.Path(__file__).resolve().parents[1]
-VERSION='0.2';PACKAGE='com.ning.27banneranimation'
+VERSION='0.3';PACKAGE='com.ning.27banneranimation'
 def run(args):subprocess.run([str(x) for x in args],check=True,cwd=ROOT)
 def ar_member(name,data):
  header=(name+'/').ljust(16)+'0'.ljust(12)+'0'.ljust(6)+'0'.ljust(6)+'100644'.ljust(8)+str(len(data)).ljust(10)+'`\n'
