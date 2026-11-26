@@ -32,7 +32,7 @@ def build(arch,sdk):
  out=ROOT/'out'/arch;out.mkdir(parents=True,exist_ok=True)
  flags=['xcrun','--sdk','iphoneos','clang','-target',arch+'-apple-ios15.0','-isysroot',sdk,
   '-fobjc-arc','-fblocks','-O2','-Wall','-Wextra','-Werror','-Wno-unused-parameter',
-  '-dynamiclib','-framework','Foundation','-framework','UIKit','-framework','QuartzCore']
+  '-dynamiclib','-framework','Foundation','-framework','UIKit','-framework','QuartzCore','-framework','CoreGraphics']
  main=out/'NB27Banner.dylib';prefs=out/'NB27Preferences'
  run(flags+[ROOT/'Sources/NB27Banner.m','-o',main])
  # PSListController is supplied by the Settings host; no fake Preferences framework binary.
