@@ -1,0 +1,38 @@
+name: Manual package build
+on:
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: Package architecture
+        required: true
+        default: both
+        type: choice
+        options: [both, arm64, arm64e]
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Fetch the exact authorized source commit
+        run: |
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Production motion and packaging checks
+        run: python3 tools/check_source.py
+      - name: Build and verify signed packages
+        env:
+          BUILD_ARCH: ${{ inputs.architecture }}
+        run: python3 tools/build.py --arch "$BUILD_ARCH"
+      - name: Preserve original build outputs
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: 27banner-animation-packages
+          path: |
+            out/*.deb
+            out/verification.json
+          if-no-files-found: error

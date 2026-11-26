@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>title</key>
+	<string>27banner animation</string>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>通知横幅动画</string>
+			<key>footerText</key>
+			<string>仅重建 GlassSuiteX 的 iOS 27 横幅进出场动画，不修改通知材质。与原插件共存时，请关闭原插件的“启用 iOS 27 通知”。开启“减弱动态效果”时回退原生动画。</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>label</key>
+			<string>启用 iOS 27 通知动画</string>
+			<key>key</key>
+			<string>Enabled</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.ning.27banneranimation</string>
+			<key>get</key>
+			<string>readPreferenceValue:</string>
+			<key>set</key>
+			<string>setPreferenceValue:specifier:</string>
+			<key>PostNotification</key>
+			<string>com.ning.27banneranimation.changed</string>
+		</dict>
+	</array>
+</dict>
+</plist>
