@@ -402,11 +402,15 @@ static void NB27AnimateHook(id animator,SEL cmd,id<UIViewControllerContextTransi
  BOOL entrance=!context.isInteractive&&(presenting||replacement)&&validTo;
  BOOL exit=!context.isInteractive&&dismissing&&validFrom&&from!=to;
  id generation=[NSObject new];
+ id previousFromGeneration=validFrom?NB27Associated(from,&NB27GenerationKey):nil;
  if(validTo)objc_setAssociatedObject(to,&NB27GenerationKey,generation,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
  if(validFrom)objc_setAssociatedObject(from,&NB27GenerationKey,generation,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
  if(dismissing&&validFrom) {
   NB27Session *pending=NB27Associated(from,&NB27PendingKey);
-  if(pending)pending.transitionGeneration=generation;
+  BOOL matches=pending&&previousFromGeneration&&pending.transitionGeneration==previousFromGeneration&&
+   CACurrentMediaTime()-pending.pendingSince<.5;
+  if(matches)pending.transitionGeneration=generation;
+  else if(pending)NB27End(pending);
  }
  if(replacement&&validFrom)NB27ClearController(from);
  if(context.isInteractive&&dismissing&&validFrom) {
