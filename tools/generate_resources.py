@@ -11,11 +11,19 @@ write('Resources/entry.plist',{'entry':{
 write('Resources/Info.plist',{
  'CFBundleIdentifier':'com.ning.27banneranimation.preferences','CFBundleName':'NB27Preferences',
  'CFBundleExecutable':'NB27Preferences','CFBundlePackageType':'BNDL',
- 'CFBundleShortVersionString':'0.3','CFBundleVersion':'0.3','NSPrincipalClass':'NB27Preferences'})
+ 'CFBundleShortVersionString':'0.4','CFBundleVersion':'0.4','NSPrincipalClass':'NB27Preferences'})
 write('Resources/Root.plist',{'title':'27banner animation','items':[
  {'cell':'PSGroupCell','label':'通知横幅动画',
-  'footerText':'iOS 27 横幅进出场动画。开启“减弱动态效果”时回退原生动画。'},
+  'footerText':'iOS27横幅进出场动画开启“减弱动态效果”时回退原生动画。'},
  {'cell':'PSSwitchCell','label':'启用 iOS 27 通知动画','key':'Enabled','default':True,
   'defaults':'com.ning.27banneranimation','get':'readPreferenceValue:',
-  'set':'setPreferenceValue:specifier:','PostNotification':'com.ning.27banneranimation.changed'}]})
+  'set':'setPreferenceValue:specifier:','PostNotification':'com.ning.27banneranimation.changed'},
+ {'cell':'PSGroupCell','label':'动画弹性'},
+ {'cell':'PSSliderCell','label':'弹性强度','key':'Elasticity','default':1.0,'min':0.0,'max':2.0,'showValue':True,
+  'defaults':'com.ning.27banneranimation','get':'readPreferenceValue:','set':'setPreferenceValue:specifier:',
+  'PostNotification':'com.ning.27banneranimation.changed'},
+ {'cell':'PSGroupCell','label':'转场时长'},
+ {'cell':'PSSliderCell','label':'时长倍率','key':'TransitionScale','default':1.0,'min':0.5,'max':2.0,'showValue':True,
+  'defaults':'com.ning.27banneranimation','get':'readPreferenceValue:','set':'setPreferenceValue:specifier:',
+  'PostNotification':'com.ning.27banneranimation.changed'}]})
 print('Generated four native plist resources')

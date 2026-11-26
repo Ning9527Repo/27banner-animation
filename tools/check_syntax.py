@@ -8,7 +8,7 @@ if not sdk.is_dir():raise SystemExit('Missing local SDK; pass --sdk PATH')
 compiler=shutil.which('clang')
 if not compiler:raise SystemExit('clang is required')
 for arch in ('arm64','arm64e'):
- for file in ('Sources/NB27Banner.m','Sources/NB27Compact.m','Preferences/NB27Preferences.m'):
+ for file in ('Sources/NB27Banner.m','Preferences/NB27Preferences.m'):
   subprocess.run([compiler,'-target',arch+'-apple-ios15.0','-isysroot',str(sdk),
    '-fobjc-arc','-fblocks','-fsyntax-only','-Wall','-Wextra','-Werror','-Wno-unused-parameter',
    str(ROOT/file)],cwd=ROOT,check=True)

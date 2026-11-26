@@ -2,7 +2,7 @@
 """Manual macOS/Xcode build. No network, installing, respring, or CI dispatch."""
 import argparse,hashlib,io,json,pathlib,plistlib,shutil,struct,subprocess,tarfile
 ROOT=pathlib.Path(__file__).resolve().parents[1]
-VERSION='0.3';PACKAGE='com.ning.27banneranimation'
+VERSION='0.4';PACKAGE='com.ning.27banneranimation'
 def run(args):subprocess.run([str(x) for x in args],check=True,cwd=ROOT)
 def ar_member(name,data):
  header=(name+'/').ljust(16)+'0'.ljust(12)+'0'.ljust(6)+'0'.ljust(6)+'100644'.ljust(8)+str(len(data)).ljust(10)+'`\n'
@@ -32,9 +32,9 @@ def build(arch,sdk):
  out=ROOT/'out'/arch;out.mkdir(parents=True,exist_ok=True)
  flags=['xcrun','--sdk','iphoneos','clang','-target',arch+'-apple-ios15.0','-isysroot',sdk,
   '-fobjc-arc','-fblocks','-O2','-Wall','-Wextra','-Werror','-Wno-unused-parameter',
-  '-dynamiclib','-framework','Foundation','-framework','UIKit','-framework','QuartzCore','-framework','CoreGraphics']
+  '-dynamiclib','-framework','Foundation','-framework','UIKit','-framework','QuartzCore']
  main=out/'NB27Banner.dylib';prefs=out/'NB27Preferences'
- run(flags+[ROOT/'Sources/NB27Banner.m',ROOT/'Sources/NB27Compact.m','-o',main])
+ run(flags+[ROOT/'Sources/NB27Banner.m','-o',main])
  # PSListController is supplied by the Settings host; no fake Preferences framework binary.
  run(flags+['-Wl,-undefined,dynamic_lookup',ROOT/'Preferences/NB27Preferences.m','-o',prefs])
  reports={}
