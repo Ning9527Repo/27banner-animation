@@ -11,10 +11,10 @@ write('Resources/entry.plist',{'entry':{
 write('Resources/Info.plist',{
  'CFBundleIdentifier':'com.ning.27banneranimation.preferences','CFBundleName':'NB27Preferences',
  'CFBundleExecutable':'NB27Preferences','CFBundlePackageType':'BNDL',
- 'CFBundleShortVersionString':'0.1','CFBundleVersion':'0.1','NSPrincipalClass':'NB27Preferences'})
+ 'CFBundleShortVersionString':'0.2','CFBundleVersion':'0.2','NSPrincipalClass':'NB27Preferences'})
 write('Resources/Root.plist',{'title':'27banner animation','items':[
  {'cell':'PSGroupCell','label':'通知横幅动画',
-  'footerText':'仅重建 GlassSuiteX 的 iOS 27 横幅进出场动画，不修改通知材质。与原插件共存时，请关闭原插件的“启用 iOS 27 通知”。开启“减弱动态效果”时回退原生动画。'},
+  'footerText':'iOS 27 横幅进出场动画。开启“减弱动态效果”时回退原生动画。'},
  {'cell':'PSSwitchCell','label':'启用 iOS 27 通知动画','key':'Enabled','default':True,
   'defaults':'com.ning.27banneranimation','get':'readPreferenceValue:',
   'set':'setPreferenceValue:specifier:','PostNotification':'com.ning.27banneranimation.changed'}]})

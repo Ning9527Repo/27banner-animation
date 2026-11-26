@@ -12,7 +12,7 @@
 			<key>label</key>
 			<string>通知横幅动画</string>
 			<key>footerText</key>
-			<string>仅重建 GlassSuiteX 的 iOS 27 横幅进出场动画，不修改通知材质。与原插件共存时，请关闭原插件的“启用 iOS 27 通知”。开启“减弱动态效果”时回退原生动画。</string>
+			<string>iOS 27 横幅进出场动画。开启“减弱动态效果”时回退原生动画。</string>
 		</dict>
 		<dict>
 			<key>cell</key>

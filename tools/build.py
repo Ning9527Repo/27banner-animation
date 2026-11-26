@@ -2,7 +2,7 @@
 """Manual macOS/Xcode build. No network, installing, respring, or CI dispatch."""
 import argparse,hashlib,io,json,pathlib,plistlib,shutil,struct,subprocess,tarfile
 ROOT=pathlib.Path(__file__).resolve().parents[1]
-VERSION='0.1';PACKAGE='com.ning.27banneranimation'
+VERSION='0.2';PACKAGE='com.ning.27banneranimation'
 def run(args):subprocess.run([str(x) for x in args],check=True,cwd=ROOT)
 def ar_member(name,data):
  header=(name+'/').ljust(16)+'0'.ljust(12)+'0'.ljust(6)+'0'.ljust(6)+'100644'.ljust(8)+str(len(data)).ljust(10)+'`\n'
@@ -34,7 +34,7 @@ def build(arch,sdk):
   '-fobjc-arc','-fblocks','-O2','-Wall','-Wextra','-Werror','-Wno-unused-parameter',
   '-dynamiclib','-framework','Foundation','-framework','UIKit','-framework','QuartzCore','-framework','CoreGraphics']
  main=out/'NB27Banner.dylib';prefs=out/'NB27Preferences'
- run(flags+[ROOT/'Sources/NB27Banner.m','-o',main])
+ run(flags+[ROOT/'Sources/NB27Banner.m',ROOT/'Sources/NB27Compact.m','-o',main])
  # PSListController is supplied by the Settings host; no fake Preferences framework binary.
  run(flags+['-Wl,-undefined,dynamic_lookup',ROOT/'Preferences/NB27Preferences.m','-o',prefs])
  reports={}
@@ -52,7 +52,7 @@ def build(arch,sdk):
  add('usr/share/doc/'+PACKAGE+'/NOTICE',(ROOT/'NOTICE.md').read_bytes())
  for file in sorted((ROOT/'Licenses').glob('*')):add('usr/share/doc/'+PACKAGE+'/Licenses/'+file.name,file.read_bytes())
  architecture='iphoneos-'+arch
- control=f'Package: {PACKAGE}\nName: 27banner animation\nVersion: {VERSION}\nArchitecture: {architecture}\nDescription: Standalone reconstructed iOS 27 banner motion for iOS 15-17.\nMaintainer: Ning&wkk\nAuthor: Ning&wkk\nSection: Tweaks\nDepends: firmware (>= 15.0), firmware (<< 18.0), mobilesubstrate, preferenceloader\n'
+ control=f'Package: {PACKAGE}\nName: 27banner animation\nVersion: {VERSION}\nArchitecture: {architecture}\nDescription: Standalone reconstructed iOS 27 banner motion for iOS 15-17.\nMaintainer: Ning\nAuthor: Ning\nSection: Tweaks\nDepends: firmware (>= 15.0), firmware (<< 18.0), mobilesubstrate, preferenceloader\n'
  checks=''.join(hashlib.md5(content).hexdigest()+'  '+path+'\n' for path,(content,mode) in sorted(data.items()))
  payload=b'!<arch>\n'+ar_member('debian-binary',b'2.0\n')+ar_member('control.tar.xz',archive({'control':(control.encode(),0o644),'md5sums':(checks.encode(),0o644)}))+ar_member('data.tar.xz',archive(data))
  package=ROOT/'out'/f'{PACKAGE}_{VERSION}_{architecture}.deb';package.write_bytes(payload)

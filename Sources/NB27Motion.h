@@ -40,7 +40,8 @@ static inline double NB27Motion(double t,unsigned c) {
       +(u3-u2)*h*NB27Slope(i+1,c);
 }
 static inline double NB27ExitDuration(double nativeDuration,double motionTime) {
- return fmin(nativeDuration-1.0/60.0,.48)*fmax(motionTime/NB27Duration,.25);
+ double cap=fmin(fmax(nativeDuration-1.0/60.0,1.0/60.0),.48);
+ return fmax(1.0/60.0,cap*fmax(motionTime/NB27Duration,.25));
 }
 /* Original exit opacity helper: 1 until 0.8, then quintic smoothstep. */
 static inline double NB27ExitOpacity(double p) {
