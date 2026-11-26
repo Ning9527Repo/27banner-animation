@@ -27,11 +27,14 @@ int main(void) {
   double rtl=fma(x,width*((1-anchor/10.0)-.5),-delta);
   closeEnough(px,-rtl);assert(isfinite(px));cases++;
  }
- for(unsigned ms=80;ms<=1000;ms+=10)for(unsigned i=0;i<217;i++) {
-  double start=.86*i/216,duration=NB27ExitDuration(ms/1000.0,start);
-  assert(duration>0&&duration<ms/1000.0);cases++;
+ for(unsigned ms=1;ms<=1000;ms++)for(unsigned i=0;i<217;i++) {
+  double native=ms/1000.0,start=.86*i/216,duration=NB27ExitDuration(native,start);
+  assert(isfinite(duration)&&duration>0&&duration<native);cases++;
   for(unsigned c=0;c<4;c++)closeEnough(NB27Motion(start,c)-NB27Motion(start,c),0);
  }
+ closeEnough(NB27ExitDuration(NAN,.4),NB27ExitDuration(1.0/60.0,.4));
+ closeEnough(NB27ExitDuration(0,.4),NB27ExitDuration(1.0/60.0,.4));
+ cases+=2;
  printf("PASS: %lu production motion/geometry assertions; no UIKit runtime claim\n",cases);
  return 0;
 }

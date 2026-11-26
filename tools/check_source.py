@@ -19,6 +19,11 @@ def check():
  assert 'NB27CompactSetEnabled(enabled)' in source and 'NB27CompactAbortExit(s.compactTicket)' in source
  assert 'pending.compactDX=old.compactDX' in source and 'pending.compactDY=old.compactDY' in source
  assert 'originSource=reusable?pending:' in source
+ assert 's.compactDX=dx;s.compactDY=dy;s.motionOriginReady=YES;' in source
+ assert 'pending.transitionGeneration==previousFromGeneration' in source
+ assert 'NB27CancelPendingForTransition(c,generation);return;' in source
+ assert 'strong.retentionOnly=YES;NB27ReleaseExitVisual(strong);NB27Expire(strong,4.0);' in source
+ assert 'remaining<.08' not in source
  assert not any(x in source for x in ('NB27Elasticity','NB27ElasticMotion'))
  compact=(ROOT/'Sources/NB27Compact.m').read_text()
  assert 'if (HaveAnchor && (!TimeItem || !TimeLabel || !source ||' in compact

@@ -40,8 +40,10 @@ static inline double NB27Motion(double t,unsigned c) {
       +(u3-u2)*h*NB27Slope(i+1,c);
 }
 static inline double NB27ExitDuration(double nativeDuration,double motionTime) {
- double cap=fmin(fmax(nativeDuration-1.0/60.0,1.0/60.0),.48);
- return fmax(1.0/60.0,cap*fmax(motionTime/NB27Duration,.25));
+ double safeDuration=isfinite(nativeDuration)&&nativeDuration>0?nativeDuration:1.0/60.0;
+ double cap=fmin(fmax(safeDuration-1.0/60.0,safeDuration*.5),.48);
+ double fraction=isfinite(motionTime)?NB27Clamp(motionTime/NB27Duration,.25,1):.25;
+ return fmin(cap*fraction,safeDuration*.9);
 }
 /* Original exit opacity helper: 1 until 0.8, then quintic smoothstep. */
 static inline double NB27ExitOpacity(double p) {
