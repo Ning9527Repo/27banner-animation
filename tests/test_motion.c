@@ -22,6 +22,11 @@ int main(void) {
  assert(NB27SampleCount==217);closeEnough(NB27Duration,.86);
  closeEnough(NB27ScaledDuration(.5),.43);closeEnough(NB27ScaledDuration(1),.86);
  closeEnough(NB27ScaledDuration(2),1.72);
+ assert(NB27ScaleDismissDelay(1000,.5)==500);
+ assert(NB27ScaleDismissDelay(1000,1.0)==1000);
+ assert(NB27ScaleDismissDelay(1000,3.0)==3000);
+ assert(NB27ScaleDismissDelay(1000,9.0)==3000);
+ assert(NB27ScaleDismissDelay(ULLONG_MAX,3.0)==ULLONG_MAX);
  for(unsigned i=0;i<=100;i++) {
   double t=NB27Duration*i/100.0;
   closeEnough(NB27MotionWithSettings(t,1,1.0,.5),NB27MotionWithElasticity(t/.5,1,1.0));

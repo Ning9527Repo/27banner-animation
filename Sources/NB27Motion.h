@@ -1,6 +1,7 @@
 #pragma once
 #include <math.h>
 #include <stddef.h>
+#include <limits.h>
 /* Reconstructed from GlassSuiteX 1.1-0, arm64e VA 0x6eb68.
  * Channels: scale.x, scale.y, normalized position.x, normalized position.y.
  * Sampler VA 0x40e48; keyframe builder VA 0x41064. Not a fitted spring. */
@@ -77,7 +78,13 @@ static inline double NB27ExitDuration(double nativeDuration,double motionTime,do
  double base=fmin(unscaledDuration-1.0/60.0,.48)*fmax(unscaledMotion/NB27Duration,.25);
  return NB27Clamp(base*scale,1.0/120.0,nativeDuration*.9);
 }
-/* Original exit opacity helper: 1 until 0.8, then quintic smoothstep. */
+static inline unsigned long long NB27ScaleDismissDelay(unsigned long long delay,double scale) {
+ if(!isfinite(scale))scale=1.0;
+ long double value=(long double)delay*(long double)NB27Clamp(scale,.5,3.0);
+ if(value>=(long double)ULLONG_MAX)return ULLONG_MAX;
+ return (unsigned long long)floorl(value+.5L);
+}
+
 static inline double NB27ExitOpacity(double p) {
  if(p<=.8) return 1;
  if(p>=1) return 0;
