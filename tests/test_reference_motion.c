@@ -11,6 +11,10 @@ int main(void) {
   for(unsigned lw=20;lw<=150;lw+=5) {
    double c=NB27ReferenceCompactCenter(80,lw,w,1);
    double rtl=NB27ReferenceCompactCenter(80,lw,w,-1);
+   double readableC=NB27ReferenceReadableCompactCenter(80,lw,w,1);
+   double readableRTL=NB27ReferenceReadableCompactCenter(80,lw,w,-1);
+   near(readableC-w*NB27ReadableCapsuleScaleX*.5,80-lw*.5);
+   near(readableRTL+w*NB27ReadableCapsuleScaleX*.5,80+lw*.5);
    near(c-w*NB27MotionNodes[0][1]*.5,80-lw*.5);
    near(rtl+w*NB27MotionNodes[0][1]*.5,80+lw*.5);
   }
@@ -20,6 +24,19 @@ int main(void) {
    double dx=w*NB27MotionNodes[0][3],dy=h*NB27MotionNodes[0][4];
    NB27ReferencePose p=NB27ReferenceAt(t,w,h,ax,ay,dx,dy);
    near(p.scaleX,NB27Motion(t,0)-1);near(p.scaleY,NB27Motion(t,1)-1);
+   NB27ReferencePose readable=NB27ReferenceReadableAtWithSettings(t,w,h,ax,ay,dx,dy,1.0,1.0);
+   NB27ReferencePose readableRTL=NB27ReferenceReadableAtWithSettings(t,w,h,1-ax,ay,-dx,dy,1.0,1.0);
+   near(readable.x,-readableRTL.x);near(readable.y,readableRTL.y);
+   near(readable.scaleX,readableRTL.scaleX);near(readable.scaleY,readableRTL.scaleY);
+   NB27ReferencePose readableStart=NB27ReferenceLayerReadableAtWithSettings(0,w,h,ax,ay,dx,dy,1.0,1.0,1.0,1.0);
+   NB27ReferencePose readableEnd=NB27ReferenceLayerReadableAtWithSettings(NB27Duration,w,h,ax,ay,dx,dy,1.0,1.0,1.0,1.0);
+   NB27ReferencePose readableExit=NB27ReferenceLayerReadableReverseWithSettings(t,NB27Duration,w,h,ax,ay,dx,dy,1.0,1.0,1.0,1.0);
+   near(readableStart.scaleX,NB27ReadableCapsuleScaleX-1);near(readableStart.scaleY,NB27ReadableCapsuleScaleY-1);
+   near(readableStart.x+(.5-ax)*w*readableStart.scaleX,dx);
+   near(readableStart.y+(.5-ay)*h*readableStart.scaleY,dy);
+   near(readableEnd.scaleX,0);near(readableEnd.scaleY,0);near(readableEnd.x,0);near(readableEnd.y,0);
+   near(readableExit.scaleX,readable.scaleX);near(readableExit.scaleY,readable.scaleY);
+   near(readableExit.x,readable.x);near(readableExit.y,readable.y);
    near(p.x,fma(p.scaleX,w*(ax-.5),w*NB27Motion(t,2)));
    near(p.y,fma(p.scaleY,h*(ay-.5),h*NB27Motion(t,3)));
   }

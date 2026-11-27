@@ -37,7 +37,7 @@ def check():
  assert 'threadState[NB27DismissScopeKey]=@{@"destination":self,@"scale":@(scale)};' in source
  assert 'NB27StartTimerABICompatible(destination,timerSelector)' in source
  assert 'NB27DismissTimerDone=YES' in source and 'NB27StartTimerWithDelayDone=YES' in source
- assert 'NB27ReferenceLayerAtWithSettings' in source and 'NB27ReferenceLayerReverseWithSettings' in source
+ assert 'NB27ReferenceLayerReadableAtWithSettings' in source and 'NB27ReferenceLayerReadableReverseWithSettings' in source
  assert not any(x in source for x in ('NB27ElasticMotion',))
  compact=(ROOT/'Sources/NB27Compact.m').read_text()
  assert 'if (HaveAnchor && (!TimeItem || !TimeLabel || !source ||' in compact
@@ -53,6 +53,8 @@ def check():
  assert 'CompactActiveScene(' in compact
  assert 'NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *reference)' in compact
  assert 'FOUNDATION_EXPORT NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *reference);' in (ROOT/'Sources/NB27Compact.h').read_text()
+ assert 'NB27CompactRaisedLineY(CGRectGetMinY(Bar)' in compact
+ assert 'lineY - 6' not in compact
  hook=source[source.index('static void NB27AnimateHook('):source.index('static void NB27AddHook(')]
  assert 'if(replacement&&!context.isInteractive&&validFrom)' in hook
  replacement_path=hook[hook.index('if(replacement&&!context.isInteractive&&validFrom)'):hook.index('BOOL entrance=')]
@@ -67,7 +69,7 @@ def check():
  assert 'if(!NB27MeasureCompactOrigin(s,card)){NB27End(s);return;}' in source
  prepare_exit=source[source.index('static NB27Session *NB27PrepareExit('):source.index('static void NB27StagePending(')]
  assert prepare_exit.index('NB27MeasureCompactOrigin(s,card)') < prepare_exit.index('NB27CompactBeginExit(s.motionOriginReady)')
- assert 'NB27ReferenceLayerAtWithSettings(' in source and 'NB27ReferenceLayerReverseWithSettings(' in source
+ assert 'NB27ReferenceLayerReadableAtWithSettings(' in source and 'NB27ReferenceLayerReadableReverseWithSettings(' in source
  assert 'com.apple.springboard.lockstate' in compact
  assert not any(x in compact for x in ('makeKeyAndVisible','MSHookMessageEx','method_setImplementation','removeAllAnimations'))
  assert 'method_copyArgumentType' in source and 'method_copyReturnType' in source

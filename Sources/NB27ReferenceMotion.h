@@ -13,6 +13,10 @@ static inline double NB27ReferenceCompactCenter(double lineCenter,double lineWid
  double cardWidth,double direction) {
  return lineCenter+direction*(cardWidth*NB27MotionNodes[0][1]-lineWidth)*.5;
 }
+static inline double NB27ReferenceReadableCompactCenter(double lineCenter,double lineWidth,
+ double cardWidth,double direction) {
+ return lineCenter+direction*(cardWidth*NB27ReadableCapsuleScaleX-lineWidth)*.5;
+}
 static inline NB27ReferencePose NB27ReferenceAt(double t,double width,double height,
  double anchorX,double anchorY,double compactDX,double compactDY) {
  double x=NB27Motion(t,0)-1,y=NB27Motion(t,1)-1;
@@ -54,6 +58,30 @@ static inline NB27ReferencePose NB27ReferenceLayerReverseWithSettings(double t,d
  double anchorX,double anchorY,double compactDX,double compactDY,double baseX,double baseY,double elasticity,double scale) {
  NB27ReferencePose p=NB27ReferenceReverseWithSettings(t,start,width*baseX,height*baseY,anchorX,anchorY,compactDX,compactDY,elasticity,scale);
  p.scaleX*=baseX;p.scaleY*=baseY;return p;
+}
+static inline NB27ReferencePose NB27ReferenceReadableAtWithSettings(double t,double width,double height,
+ double anchorX,double anchorY,double compactDX,double compactDY,double elasticity,double scale) {
+ NB27ReferencePose p=NB27ReferenceAtWithSettings(t,width,height,anchorX,anchorY,compactDX,compactDY,elasticity,scale);
+ double sx=NB27MotionReadableWithSettings(t,0,elasticity,scale)-1;
+ double sy=NB27MotionReadableWithSettings(t,1,elasticity,scale)-1;
+ p.x=fma(sx-p.scaleX,width*(anchorX-.5),p.x);
+ p.y=fma(sy-p.scaleY,height*(anchorY-.5),p.y);
+ p.scaleX=sx;p.scaleY=sy;
+ return p;
+}
+static inline NB27ReferencePose NB27ReferenceLayerReadableAtWithSettings(double t,double width,double height,
+ double anchorX,double anchorY,double compactDX,double compactDY,double baseX,double baseY,double elasticity,double scale) {
+ NB27ReferencePose p=NB27ReferenceReadableAtWithSettings(t,width*baseX,height*baseY,anchorX,anchorY,
+  compactDX,compactDY,elasticity,scale);
+ p.scaleX*=baseX;p.scaleY*=baseY;
+ return p;
+}
+static inline NB27ReferencePose NB27ReferenceLayerReadableReverseWithSettings(double t,double start,double width,double height,
+ double anchorX,double anchorY,double compactDX,double compactDY,double baseX,double baseY,double elasticity,double scale) {
+ NB27ReferencePose a=NB27ReferenceLayerReadableAtWithSettings(t,width,height,anchorX,anchorY,compactDX,compactDY,baseX,baseY,elasticity,scale);
+ NB27ReferencePose b=NB27ReferenceLayerReadableAtWithSettings(start,width,height,anchorX,anchorY,compactDX,compactDY,baseX,baseY,elasticity,scale);
+ NB27ReferencePose p={a.scaleX-b.scaleX,a.scaleY-b.scaleY,a.x-b.x,a.y-b.y};
+ return p;
 }
 /* Convert the recovered unit-scale deltas to the actual additive CA channels.
  * The position terms already compensate for the base-scaled card dimensions. */

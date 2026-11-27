@@ -167,7 +167,10 @@ static BOOL CompactCapture(UIView *item, UIView *label) {
         !CGRectContainsRect(CGRectInset(i, -.5, -.5), l) ||
         l.size.width < l.size.height * .8 || i.size.width > ScreenBounds.size.width * .45) return NO;
     CGFloat lineY = fmax(CGRectGetMaxY(Bar) - 4, CGRectGetMaxY(l) + 1);
-    CGRect line = CGRectMake(CGRectGetMinX(i), lineY, i.size.width, 2);
+    CGFloat raisedLineY = NB27CompactRaisedLineY(CGRectGetMinY(Bar), CGRectGetMaxY(Bar),
+        CGRectGetMaxY(l), lineY, 2, 6, 3, 2);
+    if (!isfinite(raisedLineY)) return NO;
+    CGRect line = CGRectMake(CGRectGetMinX(i), raisedLineY, i.size.width, 2);
     if (!CGRectContainsRect(Bar, line)) return NO;
     UIColor *color = [CompactTextColor(label) resolvedColorWithTraitCollection:label.traitCollection];
     if (!color || !color.CGColor) return NO;

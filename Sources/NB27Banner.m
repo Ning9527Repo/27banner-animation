@@ -237,7 +237,7 @@ static BOOL NB27MeasureCompactOrigin(NB27Session *s,UIView *card) {
  if(!NB27CompactOriginFromAnchor(card,anchor,&origin,&lineSize)) {
   NB27Diagnostic(@"origin-fallback",anchor.valid?@"clock snapshot cannot map to banner":@"no visible status clock");return YES;
  }
- origin.x=NB27ReferenceCompactCenter(origin.x,lineSize.width,w,sign);
+ origin.x=NB27ReferenceReadableCompactCenter(origin.x,lineSize.width,w,sign);
  CGPoint visualCenter=[card.layer convertPoint:CGPointMake(CGRectGetMidX(card.bounds),CGRectGetMidY(card.bounds))
   toLayer:card.superview.layer];
  double dx=origin.x-visualCenter.x,dy=origin.y-visualCenter.y;
@@ -258,7 +258,7 @@ static void NB27AnimateEntrance(NB27Session *s,UIView *card) {
  NSMutableArray *sx=[NSMutableArray new],*sy=[NSMutableArray new],*px=[NSMutableArray new],*py=[NSMutableArray new];
  for(NSUInteger i=0;i<NB27SampleCount;i++) {
   double t=(double)i*duration/(NB27SampleCount-1);
-  NB27ReferencePose p=NB27ReferenceLayerAtWithSettings(t,w,h,anchor.x,anchor.y,s.compactDX,s.compactDY,s.baseScaleX,s.baseScaleY,s.elasticity,s.transitionScale);
+  NB27ReferencePose p=NB27ReferenceLayerReadableAtWithSettings(t,w,h,anchor.x,anchor.y,s.compactDX,s.compactDY,s.baseScaleX,s.baseScaleY,s.elasticity,s.transitionScale);
   [sx addObject:@(p.scaleX)];[sy addObject:@(p.scaleY)];
   [px addObject:@(p.x)];[py addObject:@(p.y)];
  }
@@ -293,7 +293,7 @@ static void NB27AnimateExit(NB27Session *s) {
  // model layers. Never remeasure against its offscreen/end position here.
  for(NSUInteger i=0;i<NB27SampleCount;i++) {
   double progress=(double)i/(NB27SampleCount-1),t=(1-progress)*NB27Clamp(start,0,NB27ScaledDuration(s.transitionScale));
-  NB27ReferencePose p=NB27ReferenceLayerReverseWithSettings(t,start,w,h,anchor.x,anchor.y,s.compactDX,s.compactDY,s.baseScaleX,s.baseScaleY,s.elasticity,s.transitionScale);
+  NB27ReferencePose p=NB27ReferenceLayerReadableReverseWithSettings(t,start,w,h,anchor.x,anchor.y,s.compactDX,s.compactDY,s.baseScaleX,s.baseScaleY,s.elasticity,s.transitionScale);
   double blend=progress*progress*(3-2*progress);
   [sx addObject:@(p.scaleX)];[sy addObject:@(p.scaleY)];
   [px addObject:@(fma(blend,s.exitAdjustmentX,p.x))];[py addObject:@(fma(blend,s.exitAdjustmentY,p.y))];
