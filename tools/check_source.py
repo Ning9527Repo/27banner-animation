@@ -24,8 +24,9 @@ def check():
  assert 'if(context.transitionWasCancelled)NB27CompactAbortExit(ticket);' in source
  assert 'NB27CompactSetEnabled(BOOL enabled)' in (ROOT/'Sources/NB27Compact.h').read_text()
  assert 'pending.compactDX=old.compactDX' in source and 'pending.compactDY=old.compactDY' in source
+ assert 'pending.compactScaleX=old.compactScaleX' in source and 'pending.compactScaleY=old.compactScaleY' in source
  assert 'originSource=reusable?pending:' in source
- assert 's.compactDX=dx;s.compactDY=dy;s.motionOriginReady=YES;' in source
+ assert 's.compactDX=dx;s.compactDY=dy;s.compactScaleX=compactScaleX;s.compactScaleY=compactScaleY;s.motionOriginReady=YES;' in source
  assert 'pending.transitionGeneration==previousFromGeneration' in source
  assert 'NB27CancelPendingForTransition(c,generation);return;' in source
  assert 'NB27CompactFinishExit(strong.compactTicket);strong.compactTicket=0;' in source
@@ -37,7 +38,8 @@ def check():
  assert 'threadState[NB27DismissScopeKey]=@{@"destination":self,@"scale":@(scale)};' in source
  assert 'NB27StartTimerABICompatible(destination,timerSelector)' in source
  assert 'NB27DismissTimerDone=YES' in source and 'NB27StartTimerWithDelayDone=YES' in source
- assert 'NB27ReferenceLayerReadableAtWithSettings' in source and 'NB27ReferenceLayerReadableReverseWithSettings' in source
+ assert 'NB27ReferenceLayerCompactAtWithSettings' in source and 'NB27ReferenceLayerCompactReverseWithSettings' in source
+ assert 'NB27ReferenceCompactScale(lineSize.width' in source and 'NB27ReferenceCompactScale(lineSize.height' in source
  assert not any(x in source for x in ('NB27ElasticMotion',))
  compact=(ROOT/'Sources/NB27Compact.m').read_text()
  assert 'if (HaveAnchor && (!TimeItem || !TimeLabel || !source ||' in compact
@@ -69,7 +71,7 @@ def check():
  assert 'if(!NB27MeasureCompactOrigin(s,card)){NB27End(s);return;}' in source
  prepare_exit=source[source.index('static NB27Session *NB27PrepareExit('):source.index('static void NB27StagePending(')]
  assert prepare_exit.index('NB27MeasureCompactOrigin(s,card)') < prepare_exit.index('NB27CompactBeginExit(s.motionOriginReady)')
- assert 'NB27ReferenceLayerReadableAtWithSettings(' in source and 'NB27ReferenceLayerReadableReverseWithSettings(' in source
+ assert 'NB27ReferenceLayerCompactAtWithSettings(' in source and 'NB27ReferenceLayerCompactReverseWithSettings(' in source
  assert 'com.apple.springboard.lockstate' in compact
  assert not any(x in compact for x in ('makeKeyAndVisible','MSHookMessageEx','method_setImplementation','removeAllAnimations'))
  assert 'method_copyArgumentType' in source and 'method_copyReturnType' in source

@@ -74,7 +74,7 @@ static double NB27NativeExitDuration(id animator,id<UIViewControllerContextTrans
 @property(nonatomic,copy) NSArray<NB27Pose *> *heldPoses;
 @property(nonatomic) BOOL active,exiting,motionOriginReady,retentionOnly;
 @property(nonatomic) NSUInteger compactTicket;
-@property(nonatomic) double compactDX,compactDY,baseScaleX,baseScaleY;
+@property(nonatomic) double compactDX,compactDY,compactScaleX,compactScaleY,baseScaleX,baseScaleY;
 @property(nonatomic) double exitAdjustmentX,exitAdjustmentY;
 @property(nonatomic) NB27CompactAnchor timeAnchor;
 @property(nonatomic,strong) id<UIViewControllerContextTransitioning> transitionContext;
@@ -228,8 +228,8 @@ static BOOL NB27MeasureCompactOrigin(NB27Session *s,UIView *card) {
  }
  s.baseScaleX=baseX;s.baseScaleY=baseY;
  double w=CGRectGetWidth(card.bounds)*baseX,h=CGRectGetHeight(card.bounds)*baseY;
- double sign=card.effectiveUserInterfaceLayoutDirection==UIUserInterfaceLayoutDirectionRightToLeft?-1:1;
- s.compactDX=sign*w*NB27MotionNodes[0][3];s.compactDY=h*NB27MotionNodes[0][4];
+ s.compactScaleX=NB27MotionNodes[0][1];s.compactScaleY=NB27MotionNodes[0][2];
+ s.compactDX=w*NB27MotionNodes[0][3];s.compactDY=h*NB27MotionNodes[0][4];
  s.motionOriginReady=NO;
  CGPoint origin=CGPointZero;CGSize lineSize=CGSizeZero;
  NB27CompactAnchor anchor=s.timeAnchor;
@@ -237,14 +237,15 @@ static BOOL NB27MeasureCompactOrigin(NB27Session *s,UIView *card) {
  if(!NB27CompactOriginFromAnchor(card,anchor,&origin,&lineSize)) {
   NB27Diagnostic(@"origin-fallback",anchor.valid?@"clock snapshot cannot map to banner":@"no visible status clock");return YES;
  }
- origin.x=NB27ReferenceReadableCompactCenter(origin.x,lineSize.width,w,sign);
+ double compactScaleX=NB27ReferenceCompactScale(lineSize.width,CGRectGetWidth(card.bounds)*baseX);
+ double compactScaleY=NB27ReferenceCompactScale(lineSize.height,CGRectGetHeight(card.bounds)*baseY);
  CGPoint visualCenter=[card.layer convertPoint:CGPointMake(CGRectGetMidX(card.bounds),CGRectGetMidY(card.bounds))
   toLayer:card.superview.layer];
  double dx=origin.x-visualCenter.x,dy=origin.y-visualCenter.y;
  if(!isfinite(dx)||!isfinite(dy)||fabs(dx)>w*4||fabs(dy)>h*4) {
   NB27Diagnostic(@"origin-fallback",@"clock snapshot outside supported card coordinate range");return YES;
  }
- s.compactDX=dx;s.compactDY=dy;s.motionOriginReady=YES;
+ s.compactDX=dx;s.compactDY=dy;s.compactScaleX=compactScaleX;s.compactScaleY=compactScaleY;s.motionOriginReady=YES;
  return YES;
 }
 static void NB27AnimateEntrance(NB27Session *s,UIView *card) {
@@ -258,7 +259,7 @@ static void NB27AnimateEntrance(NB27Session *s,UIView *card) {
  NSMutableArray *sx=[NSMutableArray new],*sy=[NSMutableArray new],*px=[NSMutableArray new],*py=[NSMutableArray new];
  for(NSUInteger i=0;i<NB27SampleCount;i++) {
   double t=(double)i*duration/(NB27SampleCount-1);
-  NB27ReferencePose p=NB27ReferenceLayerReadableAtWithSettings(t,w,h,anchor.x,anchor.y,s.compactDX,s.compactDY,s.baseScaleX,s.baseScaleY,s.elasticity,s.transitionScale);
+  NB27ReferencePose p=NB27ReferenceLayerCompactAtWithSettings(t,w,h,anchor.x,anchor.y,s.compactDX,s.compactDY,s.baseScaleX,s.baseScaleY,s.compactScaleX,s.compactScaleY,s.elasticity,s.transitionScale);
   [sx addObject:@(p.scaleX)];[sy addObject:@(p.scaleY)];
   [px addObject:@(p.x)];[py addObject:@(p.y)];
  }
@@ -293,7 +294,7 @@ static void NB27AnimateExit(NB27Session *s) {
  // model layers. Never remeasure against its offscreen/end position here.
  for(NSUInteger i=0;i<NB27SampleCount;i++) {
   double progress=(double)i/(NB27SampleCount-1),t=(1-progress)*NB27Clamp(start,0,NB27ScaledDuration(s.transitionScale));
-  NB27ReferencePose p=NB27ReferenceLayerReadableReverseWithSettings(t,start,w,h,anchor.x,anchor.y,s.compactDX,s.compactDY,s.baseScaleX,s.baseScaleY,s.elasticity,s.transitionScale);
+  NB27ReferencePose p=NB27ReferenceLayerCompactReverseWithSettings(t,start,w,h,anchor.x,anchor.y,s.compactDX,s.compactDY,s.baseScaleX,s.baseScaleY,s.compactScaleX,s.compactScaleY,s.elasticity,s.transitionScale);
   double blend=progress*progress*(3-2*progress);
   [sx addObject:@(p.scaleX)];[sy addObject:@(p.scaleY)];
   [px addObject:@(fma(blend,s.exitAdjustmentX,p.x))];[py addObject:@(fma(blend,s.exitAdjustmentY,p.y))];
@@ -395,6 +396,7 @@ static NB27Session *NB27PrepareExit(id animator,id<UIViewControllerContextTransi
  if(reusable&&pending.transitionScale!=transitionScale)start=NB27ScaledDuration(transitionScale);
  NB27Session *originSource=reusable?pending:((old.active&&old.card==card&&old.startedAt>0)?old:nil);
  double dx=originSource.compactDX,dy=originSource.compactDY;
+ double compactScaleX=originSource.compactScaleX,compactScaleY=originSource.compactScaleY;
  NB27End(old);NB27End(pending);
  NB27Session *s=NB27NewSession(controller);s.card=card;s.exiting=YES;s.heldPoses=poses;
  s.elasticity=elasticity;s.transitionScale=transitionScale;s.transitionContext=context;
@@ -408,6 +410,7 @@ static NB27Session *NB27PrepareExit(id animator,id<UIViewControllerContextTransi
    s.exitAdjustmentX=s.compactDX-dx;s.exitAdjustmentY=s.compactDY-dy;
   }
   s.compactDX=dx;s.compactDY=dy;
+  s.compactScaleX=compactScaleX;s.compactScaleY=compactScaleY;
  }
  s.compactTicket=NB27CompactBeginExit(s.motionOriginReady);
  s.startMotionTime=start;s.nativeDuration=duration;s.exitDuration=NB27ExitDuration(duration,start,transitionScale);
@@ -423,6 +426,7 @@ static void NB27StagePending(NB27Session *old) {
  pending.heldPoses=NB27Capture(old.guardedLayers.allObjects);
  pending.transitionGeneration=NB27Associated(controller,&NB27GenerationKey);
  pending.compactDX=old.compactDX;pending.compactDY=old.compactDY;
+ pending.compactScaleX=old.compactScaleX;pending.compactScaleY=old.compactScaleY;
  double elapsed=CACurrentMediaTime()-old.startedAt;
  pending.startMotionTime=NB27Clamp(elapsed,0,NB27ScaledDuration(old.transitionScale));
  pending.elasticity=old.elasticity;pending.transitionScale=old.transitionScale;
