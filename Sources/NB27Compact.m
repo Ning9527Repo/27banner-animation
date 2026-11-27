@@ -39,11 +39,13 @@ static __weak UIWindow *SourceWindow;
 static UIColor *Ink;
 static NB27CompactWindow *Window;
 static CALayer *Stroke;
+static NSString *const CompactOpacityKey = @"com.ning.27banneranimation.compact.opacity";
 static NSTimer *Timer;
 static NB27CompactWatch *Watch;
 static CFTimeInterval LastScan = -DBL_MAX;
 static void CompactRefresh(void);
 static void CompactObserve(void);
+static void CompactScheduleExpiry(uintptr_t ticket);
 
 static BOOL CompactRect(CGRect r) {
     return isfinite(r.origin.x) && isfinite(r.origin.y) &&
@@ -331,7 +333,27 @@ static BOOL CompactContext(UIView *card) {
     if (!HaveAnchor) CompactScan();
     return HaveAnchor;
 }
-static void CompactShow(void) {
+static float CompactFreezeOpacity(void) {
+    if (!Stroke) return 0;
+    float opacity = Stroke.presentationLayer ? ((CALayer *)Stroke.presentationLayer).opacity : Stroke.opacity;
+    [Stroke removeAnimationForKey:CompactOpacityKey];
+    [CATransaction begin]; [CATransaction setDisableActions:YES]; Stroke.opacity = opacity; [CATransaction commit];
+    return opacity;
+}
+static void CompactSetOpacity(float opacity, NSTimeInterval duration) {
+    if (!Stroke || !Window) return;
+    float current = Stroke.presentationLayer ? ((CALayer *)Stroke.presentationLayer).opacity : Stroke.opacity;
+    [Stroke removeAnimationForKey:CompactOpacityKey];
+    opacity = fminf(1, fmaxf(0, opacity));
+    [CATransaction begin]; [CATransaction setDisableActions:YES]; Stroke.opacity = opacity; [CATransaction commit];
+    if (duration > 0) {
+        CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"opacity"];
+        animation.fromValue = @(current); animation.toValue = @(opacity); animation.duration = duration;
+        animation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+        [Stroke addAnimation:animation forKey:CompactOpacityKey];
+    }
+}
+static BOOL CompactShow(void) {
     if (!Window) {
         Window = [[NB27CompactWindow alloc] initWithWindowScene:Scene];
         Window.frame = SceneBounds; Window.expectedScreen = ScreenBounds; Window.expectedScene = SceneBounds;
@@ -341,17 +363,18 @@ static void CompactShow(void) {
         root.view = [[UIView alloc] initWithFrame:Window.bounds];
         root.view.backgroundColor = UIColor.clearColor; root.view.opaque = NO;
         root.view.userInteractionEnabled = NO; root.view.accessibilityElementsHidden = YES;
-        Window.rootViewController = root; Stroke = [CALayer layer];
+        Window.rootViewController = root; Stroke = [CALayer layer]; Stroke.opacity = 0;
         Stroke.cornerRadius = 1; [root.view.layer addSublayer:Stroke];
     }
     CGRect local = [Window.rootViewController.view convertRect:Line fromCoordinateSpace:Screen.coordinateSpace];
-    if (!CompactRect(local) || !CGRectContainsRect(Window.bounds, local)) { Window.hidden = YES; return; }
+    if (!CompactRect(local) || !CGRectContainsRect(Window.bounds, local)) { Window.hidden = YES; return NO; }
     [CATransaction begin]; [CATransaction setDisableActions:YES];
     Stroke.frame = local; Stroke.backgroundColor = Ink.CGColor; [CATransaction commit];
     Window.hidden = NO; /* Never makeKey, never write any other window/root. */
+    return YES;
 }
 static void CompactTimer(void) {
-    BOOL need = State.enabled && (State.retained || State.pending);
+    BOOL need = State.enabled && (State.retained || State.pending || State.preview);
     if (!need) { [Timer invalidate]; Timer = nil; return; }
     if (!Timer) {
         Timer = [NSTimer timerWithTimeInterval:1 target:Watch selector:@selector(tick:) userInfo:nil repeats:YES];
@@ -359,10 +382,25 @@ static void CompactTimer(void) {
     }
 }
 static void CompactRefresh(void) {
-    if (Window) Window.hidden = YES;
-    if (State.retained && CompactContext(nil)) CompactShow();
-    else CompactAllowed();
+    BOOL safe = State.enabled && CompactContext(nil);
+    BOOL visible = safe && (State.retained || State.preview);
+    if (visible && CompactShow()) {
+        if (State.retained && !State.fading && !State.preview && !State.pendingHadRetained) CompactSetOpacity(1, 0);
+    } else if (Window) {
+        Window.hidden = YES;
+    }
     CompactTimer();
+}
+static void CompactScheduleExpiry(uintptr_t ticket) {
+    if (!NB27CompactStateScheduleExpiry(&State, ticket)) return;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        if (!NB27CompactStateBeginFade(&State, ticket)) return;
+        CompactRefresh();
+        CompactSetOpacity(0, .30);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(.30 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (NB27CompactStateExpire(&State, ticket)) CompactRefresh();
+        });
+    });
 }
 @implementation NB27CompactWatch
 - (void)changed:(NSNotification *)note {
@@ -443,18 +481,43 @@ NSUInteger NB27CompactBeginExit(BOOL supported) {
     if (!NSThread.isMainThread || !CompactAllowed()) return 0;
     CompactObserve();
     NSUInteger ticket = (NSUInteger)NB27CompactStateBegin(&State, supported);
-    CompactTimer(); return ticket;
+    CompactTimer(); CompactRefresh(); return ticket;
+}
+void NB27CompactAnimateExit(NSUInteger ticket, double duration) {
+    if (!NSThread.isMainThread) { dispatch_async(dispatch_get_main_queue(), ^{ NB27CompactAnimateExit(ticket, duration); }); return; }
+    if (!ticket || !isfinite(duration) || duration <= 0 || !CompactAllowed()) return;
+    float previousOpacity = State.retained ? CompactFreezeOpacity() : 0;
+    if (!NB27CompactStateRevealStart(&State, (uintptr_t)ticket) || !CompactContext(nil) || !CompactShow()) return;
+    if (!State.pendingHadRetained) {
+        [CATransaction begin]; [CATransaction setDisableActions:YES]; Stroke.opacity = 0; [CATransaction commit];
+    } else {
+        [CATransaction begin]; [CATransaction setDisableActions:YES]; Stroke.opacity = previousOpacity; [CATransaction commit];
+    }
+    uint64_t generation = (uint64_t)ticket;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(duration * .65 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (!State.enabled || (State.pending != generation && State.retainedTicket != generation) || !State.preview) return;
+        if (!CompactContext(nil) || !CompactShow()) return;
+        CompactSetOpacity(1, duration * .35);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(duration * .35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    if (!NB27CompactStateRevealComplete(&State, (uintptr_t)generation)) return;
+    CompactRefresh();
+    if (State.retained && State.retainedTicket == generation) CompactScheduleExpiry((uintptr_t)generation);
+        });
+    });
 }
 void NB27CompactFinishExit(NSUInteger ticket) {
     if (!NSThread.isMainThread) { dispatch_async(dispatch_get_main_queue(), ^{ NB27CompactFinishExit(ticket); }); return; }
     if (!CompactAllowed() || !NB27CompactStateFinish(&State, (uintptr_t)ticket)) return;
     CompactRefresh();
-    uint64_t generation=(uint64_t)ticket;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,2*NSEC_PER_SEC),dispatch_get_main_queue(),^{
-        if (NB27CompactStateExpire(&State,(uintptr_t)generation)) CompactRefresh();
-    });
+    if (!State.preview) CompactScheduleExpiry((uintptr_t)ticket);
 }
 void NB27CompactAbortExit(NSUInteger ticket) {
     if (!NSThread.isMainThread) { dispatch_async(dispatch_get_main_queue(), ^{ NB27CompactAbortExit(ticket); }); return; }
-    if (CompactAllowed() && NB27CompactStateAbort(&State, (uintptr_t)ticket)) { CompactTimer(); CompactRefresh(); }
+    if (!CompactAllowed() || !NB27CompactStateAbort(&State, (uintptr_t)ticket)) return;
+    CompactRefresh();
+    if (State.retained) {
+        CompactSetOpacity(1, .15);
+        CompactScheduleExpiry((uintptr_t)State.retainedTicket);
+    }
+    CompactTimer();
 }

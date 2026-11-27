@@ -23,5 +23,6 @@ FOUNDATION_EXPORT NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *referen
 FOUNDATION_EXPORT BOOL NB27CompactOriginFromAnchor(UIView *card, NB27CompactAnchor anchor,
     CGPoint *centerInLayerParent, CGSize *lineSize);
 FOUNDATION_EXPORT NSUInteger NB27CompactBeginExit(BOOL supported);
+FOUNDATION_EXPORT void NB27CompactAnimateExit(NSUInteger ticket, double duration);
 FOUNDATION_EXPORT void NB27CompactFinishExit(NSUInteger ticket);
 FOUNDATION_EXPORT void NB27CompactAbortExit(NSUInteger ticket);

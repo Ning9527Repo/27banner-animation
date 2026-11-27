@@ -38,6 +38,7 @@ static void NB27AnimateExit(NB27Session *s);
 static void NB27ClearController(UIViewController *controller);
 static void NB27AbortNativeExit(id object);
 static void NB27BeginNativeExit(id animator,id<UIViewControllerContextTransitioning> context);
+static double NB27NativeExitDuration(id animator,id<UIViewControllerContextTransitioning> context);
 
 @interface NB27Pose:NSObject
 @property(nonatomic,weak) CALayer *layer;
@@ -206,7 +207,9 @@ static void NB27Expire(NB27Session *s,double delay) {
   if(!strong||!strong.active)return;
   if(strong.exiting&&!strong.transitionContext.transitionWasCancelled) {
    if(!strong.retentionOnly) {
-    strong.retentionOnly=YES;NB27ReleaseExitVisual(strong);NB27Expire(strong,4.0);
+    strong.retentionOnly=YES;
+    NB27CompactFinishExit(strong.compactTicket);strong.compactTicket=0;
+    NB27ReleaseExitVisual(strong);NB27Expire(strong,4.0);
    } else NB27End(strong);
   } else NB27End(strong);
  });
@@ -303,7 +306,9 @@ static void NB27AnimateExit(NB27Session *s) {
   NB27Keyframes(@"opacity",alpha,s.exitDuration,YES)];
  g.duration=s.exitDuration;g.beginTime=[card.layer convertTime:now fromLayer:nil];
  g.fillMode=kCAFillModeBoth;g.removedOnCompletion=NO;g.delegate=s;NB27SetFrameRate(g,card);
- [card.layer addAnimation:g forKey:NB27ExitKey];NB27Expire(s,s.nativeDuration+.15);
+ [card.layer addAnimation:g forKey:NB27ExitKey];
+ NB27CompactAnimateExit(s.compactTicket,s.exitDuration);
+ NB27Expire(s,s.nativeDuration+.15);
 }
 static CAAnimation *NB27Neutralize(CAAnimation *animation,BOOL exit) {
  if([animation isKindOfClass:CAAnimationGroup.class]) {
@@ -362,10 +367,10 @@ static BOOL NB27IsReplacement(id animator) {
 }
 static NB27Session *NB27PrepareExit(id animator,id<UIViewControllerContextTransitioning> context,
  UIViewController *controller,double overrideDuration) {
- if(!NB27Enabled()||NB27IsReplacement(animator))return nil;
+ if(!NB27Enabled())return nil;
  SEL selector=NSSelectorFromString(@"transitionDuration:");
- if(![animator respondsToSelector:selector])return nil;
- double duration=overrideDuration>=0?overrideDuration:((double(*)(id,SEL,id))objc_msgSend)(animator,selector,context);
+ double duration=overrideDuration>=0?overrideDuration:
+  ([animator respondsToSelector:selector]?((double(*)(id,SEL,id))objc_msgSend)(animator,selector,context):.25);
  if(!isfinite(duration)||duration<0)return nil;
  duration=fmax(duration,1.0/60.0);
  UIView *card=NB27Card(context,controller,NO);if(!NB27ValidCard(card))return nil;
@@ -393,6 +398,7 @@ static NB27Session *NB27PrepareExit(id animator,id<UIViewControllerContextTransi
  NB27End(old);NB27End(pending);
  NB27Session *s=NB27NewSession(controller);s.card=card;s.exiting=YES;s.heldPoses=poses;
  s.elasticity=elasticity;s.transitionScale=transitionScale;s.transitionContext=context;
+ if(NB27IsReplacement(animator)) s.timeAnchor=NB27CompactPrepareTimeAnchor(context.containerView);
  if(!NB27MeasureCompactOrigin(s,card)) {
   NB27CompactBeginExit(NO);NB27End(s);return nil;
  }
@@ -452,6 +458,7 @@ static void NB27AnimateHook(id animator,SEL cmd,id<UIViewControllerContextTransi
  BOOL dismissing=transition&&[animator isKindOfClass:transition]&&knows&&!presenting&&!replacement;
  BOOL entrance=!context.isInteractive&&(presenting||replacement)&&validTo;
  BOOL exit=!context.isInteractive&&dismissing&&validFrom&&from!=to;
+ BOOL replacementExit=!context.isInteractive&&replacement&&validFrom&&from!=to;
  id generation=[NSObject new];
  id previousFromGeneration=validFrom?NB27Associated(from,&NB27GenerationKey):nil;
  if(validTo)objc_setAssociatedObject(to,&NB27GenerationKey,generation,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -463,7 +470,11 @@ static void NB27AnimateHook(id animator,SEL cmd,id<UIViewControllerContextTransi
   if(matches)pending.transitionGeneration=generation;
   else if(pending)NB27End(pending);
  }
- if(replacement&&validFrom)NB27ClearController(from);
+ if(replacement&&validFrom) {
+  NB27Session *pending=NB27Associated(from,&NB27PendingKey);
+  if(pending)pending.transitionGeneration=generation;
+  else NB27StagePending(NB27Associated(from,&NB27CurrentKey));
+ }
  if(context.isInteractive&&dismissing&&validFrom) {
   NB27OriginalAnimate(animator,cmd,context);
   id<UIViewControllerTransitionCoordinator> coordinator=from.transitionCoordinator;
@@ -492,7 +503,7 @@ static void NB27AnimateHook(id animator,SEL cmd,id<UIViewControllerContextTransi
  }
  UIView *card=entrance?NB27Card(context,to,YES):nil;
  if(entrance&&(!card||CGRectGetHeight(card.bounds)>360))entrance=NO;
- NB27Session *outgoing=exit?NB27PrepareExit(animator,context,from,-1):nil;
+ NB27Session *outgoing=(exit||replacementExit)?NB27PrepareExit(animator,context,from,-1):nil;
  NB27Session *incoming=nil;
  if(entrance) {
   NB27ClearController(to);NB27RemoveCardAnimations(card);incoming=NB27NewSession(to);
@@ -534,7 +545,7 @@ static void NB27DidDisappear(id self,SEL cmd,id presentable,id reason) {
  NB27Session *s=NB27FindSession(presentable);
  // Native lifecycle confirmation, not the CA delegate, owns retention. Commit
  // before calling original because it may remove our animation/delegate.
- if(s.active&&s.exiting&&s.transitionContext&&!s.transitionContext.transitionWasCancelled) {
+ if(s.exiting&&s.transitionContext&&!s.transitionContext.transitionWasCancelled) {
   NB27CompactFinishExit(s.compactTicket);s.compactTicket=0;
  }
  NB27OriginalDidDisappear(self,cmd,presentable,reason);
@@ -577,6 +588,12 @@ static void NB27AbortNativeExit(id object) {
  NB27CompactAbortExit([state[@"ticket"] unsignedIntegerValue]);
  objc_setAssociatedObject(object,&NB27NativeExitKey,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
+static double NB27NativeExitDuration(id animator,id<UIViewControllerContextTransitioning> context) {
+ SEL selector=NSSelectorFromString(@"transitionDuration:");
+ if(!animator||!context||![animator respondsToSelector:selector])return .25;
+ double duration=((double(*)(id,SEL,id))objc_msgSend)(animator,selector,context);
+ return isfinite(duration)&&duration>0?duration:.25;
+}
 static void NB27BeginNativeExit(id animator,id<UIViewControllerContextTransitioning> context) {
  if(!context||context.isInteractive||!NB27UserEnabled||NB27OriginalEnabled)return;
  Class transition=NSClassFromString(@"BNBannerTransitionAnimator");
@@ -592,10 +609,14 @@ static void NB27BeginNativeExit(id animator,id<UIViewControllerContextTransition
  NSUInteger ticket=NB27CompactBeginExit(YES);if(!ticket)return;
  NSDictionary *state=@{@"ticket":@(ticket),@"context":context};
  objc_setAssociatedObject(controller,&NB27NativeExitKey,state,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+ NB27CompactAnimateExit(ticket,NB27ExitDuration(NB27NativeExitDuration(animator,context),NB27ScaledDuration(NB27TransitionScale),NB27TransitionScale));
  __weak UIViewController *weakController=controller;
  dispatch_after(dispatch_time(DISPATCH_TIME_NOW,5*NSEC_PER_SEC),dispatch_get_main_queue(),^{
   UIViewController *strong=weakController;
-  if((id)NB27Associated(strong,&NB27NativeExitKey)==state)NB27AbortNativeExit(strong);
+  if((id)NB27Associated(strong,&NB27NativeExitKey)==state) {
+   if(!context.transitionWasCancelled) NB27CompactFinishExit([state[@"ticket"] unsignedIntegerValue]);
+   NB27AbortNativeExit(strong);
+  }
  });
 }
 

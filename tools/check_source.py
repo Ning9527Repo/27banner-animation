@@ -28,7 +28,8 @@ def check():
  assert 's.compactDX=dx;s.compactDY=dy;s.motionOriginReady=YES;' in source
  assert 'pending.transitionGeneration==previousFromGeneration' in source
  assert 'NB27CancelPendingForTransition(c,generation);return;' in source
- assert 'strong.retentionOnly=YES;NB27ReleaseExitVisual(strong);NB27Expire(strong,4.0);' in source
+ assert 'NB27CompactFinishExit(strong.compactTicket);strong.compactTicket=0;' in source
+ assert 'strong.retentionOnly=YES;' in source and 'NB27ReleaseExitVisual(strong);NB27Expire(strong,4.0);' in source
  assert 'remaining<.08' not in source
  assert 'NB27Elasticity=1.0' in source and 'NB27TransitionScale=1.0' in source
  assert 'NB27DwellScale=1.0' in source and 'CFSTR("DwellScale")' in source
