@@ -58,10 +58,17 @@ def check():
  assert 'NB27CompactRaisedLineY(CGRectGetMinY(Bar)' in compact
  assert 'lineY - 6' not in compact
  hook=source[source.index('static void NB27AnimateHook('):source.index('static void NB27AddHook(')]
- assert 'if(replacement&&!context.isInteractive&&validFrom)' in hook
- replacement_path=hook[hook.index('if(replacement&&!context.isInteractive&&validFrom)'):hook.index('BOOL entrance=')]
+ assert 'static BOOL NB27IsReplacementTransition(id animator,id<UIViewControllerContextTransitioning> context)' in source
+ replacement_detect=source[source.index('static BOOL NB27IsReplacementTransition'):source.index('static NB27Session *NB27PrepareExit(')]
+ assert 'if(NB27IsReplacement(animator))return YES;' in replacement_detect
+ assert 'from!=to&&[from isKindOfClass:presentable]&&[to isKindOfClass:presentable]' in replacement_detect
+ assert 'BOOL replacement=NB27IsReplacementTransition(animator,context);' in hook
+ assert 'if(replacement) {' in hook and 'if(replacement&&validFrom)' not in hook
+ replacement_path=hook[hook.index('if(replacement) {'):hook.index('BOOL entrance=')]
  assert 'NB27OriginalAnimate(animator,cmd,context);' in replacement_path
- assert 'if(context.transitionWasCancelled)NB27AbortNativeExit(from);' in replacement_path
+ assert 'NB27BeginNativeExit(animator,context);' in replacement_path
+ assert 'NB27AnimateEntrance' not in replacement_path and 'NB27AnimateExit' not in replacement_path
+ assert 'if(context.transitionWasCancelled&&from)NB27AbortNativeExit(from);' in replacement_path
  assert 'BOOL entrance=!context.isInteractive&&presenting&&validTo;' in hook
  assert 'BOOL exit=!context.isInteractive&&dismissing&&validFrom&&from!=to;' in hook
  assert 'NB27CompactAnimateExit(ticket,NB27ExitDuration' in source
