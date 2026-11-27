@@ -54,6 +54,14 @@ def check():
  assert 'NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *reference)' in compact
  assert 'FOUNDATION_EXPORT NB27CompactAnchor NB27CompactPrepareTimeAnchor(UIView *reference);' in (ROOT/'Sources/NB27Compact.h').read_text()
  hook=source[source.index('static void NB27AnimateHook('):source.index('static void NB27AddHook(')]
+ assert 'if(replacement&&!context.isInteractive&&validFrom)' in hook
+ replacement_path=hook[hook.index('if(replacement&&!context.isInteractive&&validFrom)'):hook.index('BOOL entrance=')]
+ assert 'NB27OriginalAnimate(animator,cmd,context);' in replacement_path
+ assert 'if(context.transitionWasCancelled)NB27AbortNativeExit(from);' in replacement_path
+ assert 'BOOL entrance=!context.isInteractive&&presenting&&validTo;' in hook
+ assert 'BOOL exit=!context.isInteractive&&dismissing&&validFrom&&from!=to;' in hook
+ assert 'NB27CompactAnimateExit(ticket,NB27ExitDuration' in source
+ assert '.6 * NSEC_PER_SEC' in compact
  pre=hook.index('incoming.timeAnchor=NB27CompactPrepareTimeAnchor(context.containerView);')
  assert pre < hook.rindex('NB27OriginalAnimate(animator,cmd,context);') < hook.index('NB27AnimateEntrance(incoming,actual);')
  assert 'if(!NB27MeasureCompactOrigin(s,card)){NB27End(s);return;}' in source

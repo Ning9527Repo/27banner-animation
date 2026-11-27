@@ -393,7 +393,7 @@ static void CompactRefresh(void) {
 }
 static void CompactScheduleExpiry(uintptr_t ticket) {
     if (!NB27CompactStateScheduleExpiry(&State, ticket)) return;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         if (!NB27CompactStateBeginFade(&State, ticket)) return;
         CompactRefresh();
         CompactSetOpacity(0, .30);

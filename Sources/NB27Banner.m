@@ -456,9 +456,15 @@ static void NB27AnimateHook(id animator,SEL cmd,id<UIViewControllerContextTransi
  BOOL presenting=knows&&((BOOL(*)(id,SEL))objc_msgSend)(animator,presentingSelector);
  Class transition=NSClassFromString(@"BNBannerTransitionAnimator");
  BOOL dismissing=transition&&[animator isKindOfClass:transition]&&knows&&!presenting&&!replacement;
- BOOL entrance=!context.isInteractive&&(presenting||replacement)&&validTo;
+ if(replacement&&!context.isInteractive&&validFrom) {
+  NB27ClearController(from);NB27ClearController(to);
+  NB27BeginNativeExit(animator,context);
+  NB27OriginalAnimate(animator,cmd,context);
+  if(context.transitionWasCancelled)NB27AbortNativeExit(from);
+  return;
+ }
+ BOOL entrance=!context.isInteractive&&presenting&&validTo;
  BOOL exit=!context.isInteractive&&dismissing&&validFrom&&from!=to;
- BOOL replacementExit=!context.isInteractive&&replacement&&validFrom&&from!=to;
  id generation=[NSObject new];
  id previousFromGeneration=validFrom?NB27Associated(from,&NB27GenerationKey):nil;
  if(validTo)objc_setAssociatedObject(to,&NB27GenerationKey,generation,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -503,7 +509,7 @@ static void NB27AnimateHook(id animator,SEL cmd,id<UIViewControllerContextTransi
  }
  UIView *card=entrance?NB27Card(context,to,YES):nil;
  if(entrance&&(!card||CGRectGetHeight(card.bounds)>360))entrance=NO;
- NB27Session *outgoing=(exit||replacementExit)?NB27PrepareExit(animator,context,from,-1):nil;
+ NB27Session *outgoing=exit?NB27PrepareExit(animator,context,from,-1):nil;
  NB27Session *incoming=nil;
  if(entrance) {
   NB27ClearController(to);NB27RemoveCardAnimations(card);incoming=NB27NewSession(to);
@@ -598,7 +604,10 @@ static void NB27BeginNativeExit(id animator,id<UIViewControllerContextTransition
  if(!context||context.isInteractive||!NB27UserEnabled||NB27OriginalEnabled)return;
  Class transition=NSClassFromString(@"BNBannerTransitionAnimator");
  SEL presentingSelector=NSSelectorFromString(@"isPresenting");
- if(!transition||![animator isKindOfClass:transition]||![animator respondsToSelector:presentingSelector]||
+ BOOL replacement=NB27IsReplacement(animator);
+ if(replacement) {
+  if(!NB27Enabled())return;
+ } else if(!transition||![animator isKindOfClass:transition]||![animator respondsToSelector:presentingSelector]||
     ((BOOL(*)(id,SEL))objc_msgSend)(animator,presentingSelector))return;
  UIViewController *controller=[context viewControllerForKey:UITransitionContextFromViewControllerKey];
  Class presentable=NSClassFromString(@"SBNotificationPresentableViewController");
